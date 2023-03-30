@@ -1,8 +1,13 @@
 use image::imageops::colorops::grayscale;
 use image::{GenericImageView, ImageBuffer, Luma, Pixel};
 
-const TARGET_IMG_HEIGHT_PIXELS: u32 = 100;
-const TARGET_IMG_WIDTH_PIXELS: u32 = 100;
+const TARGET_IMG_HEIGHT_PIXELS: u32 = 108;
+const TARGET_IMG_WIDTH_PIXELS: u32 = 68;
+
+// pixel height (on typewriter) is 2.1 mm
+// pixel width (on typewriter) is 2.5 mm
+
+const CHAR_SET: [char; 8] = [' ', '.', ':', 'V', 'I', 'Z', 'N', 'M'];
 
 fn main() {
     let img = image::open("IMG_1167.JPG").unwrap();
@@ -15,6 +20,40 @@ fn main() {
             image::Luma([get_aggregate_pixel_at(x, y, width, height, &img)])
         });
     target_img.save("test.png").unwrap();
+
+    // for now we will use a linear scale for each character in the char set and see how it looks.
+
+    let mut output = Vec::<String>::new();
+
+    for row in target_img.rows() {
+        let mut s = String::new();
+        for pixel in row {
+            let val: u8 = 255 - pixel.0[0];
+            let index = val / 32;
+            let char = CHAR_SET[index as usize];
+
+            print!("{}", char);
+            s += char.to_string().as_str();
+        }
+        output.push(s);
+        println!("");
+    }
+
+    for string in output {
+        let mut curr_char = string.chars().next().unwrap();
+        let mut count: u32 = 1;
+        for char in string.chars().skip(1) {
+            if char == curr_char {
+                count += 1;
+            } else {
+                print!("({}, {}) ", curr_char, count);
+                count = 1;
+                curr_char = char;
+            }
+        }
+        print!("({}, {}) ", curr_char, count);
+        println!("");
+    }
 }
 
 fn get_aggregate_pixel_at<I: GenericImageView<Pixel = Luma<u8>>>(
