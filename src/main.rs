@@ -7,7 +7,8 @@ const TARGET_IMG_WIDTH_PIXELS: u32 = 68;
 // pixel height (on typewriter) is 2.1 mm
 // pixel width (on typewriter) is 2.5 mm
 
-const CHAR_SET: [char; 8] = [' ', '.', ':', 'V', 'I', 'Z', 'N', 'M'];
+const CHAR_SET: [char; 8] = [' ', '.', ':', ';', 'I', 'V', 'N', 'M'];
+const CHAR_BRIGHTNESSES: [i32; 8] = [255, 219, 182, 146, 109, 73, 36, 0];
 
 fn main() {
     let img = image::open("IMG_1167.JPG").unwrap();
@@ -15,45 +16,84 @@ fn main() {
 
     let (width, height) = img.dimensions();
 
-    let target_img =
+    // target image will be the original image (img) rescaled, where each pixel in target_img will
+    // be the average of the corresponding area in img.
+    let mut target_img =
         ImageBuffer::from_fn(TARGET_IMG_WIDTH_PIXELS, TARGET_IMG_HEIGHT_PIXELS, |x, y| {
             image::Luma([get_aggregate_pixel_at(x, y, width, height, &img)])
         });
-    target_img.save("test.png").unwrap();
 
     // for now we will use a linear scale for each character in the char set and see how it looks.
 
     let mut output = Vec::<String>::new();
-
-    for row in target_img.rows() {
+    for row_index in 0..target_img.height() {
         let mut s = String::new();
-        for pixel in row {
-            let val: u8 = 255 - pixel.0[0];
-            let index = val / 32;
-            let char = CHAR_SET[index as usize];
+        for col_index in 0..target_img.width() {
+            let pixel = target_img.get_pixel(col_index, row_index);
+            let val: u8 = pixel.0[0];
+            let (char, pixel_value) = find_closest_value_in_arr(val as i32);
+            let pixel_value = pixel_value as u8;
+            let error = val as i32 - pixel_value as i32;
 
-            print!("{}", char);
+            // propagate the error to neighboring pixels using the Floyd–Steinberg dithering coefficients
+            // https://en.wikipedia.org/wiki/Floyd%E2%80%93Steinberg_dithering
+            if let Some(p) =
+                target_img.get_pixel_mut_checked((col_index + 1) as u32, row_index as u32)
+            {
+                let mut value = p.0[0];
+                value = value.saturating_add_signed((error * 7 / 16) as i8);
+
+                *p = image::Luma([value]);
+            }
+            if let Some(p) = target_img
+                .get_pixel_mut_checked(col_index.saturating_sub(1), (row_index + 1) as u32)
+            {
+                let mut value = p.0[0];
+                value = value.saturating_add_signed((error * 3 / 16) as i8);
+
+                *p = image::Luma([value]);
+            }
+            if let Some(p) =
+                target_img.get_pixel_mut_checked((col_index) as u32, (row_index + 1) as u32)
+            {
+                let mut value = p.0[0];
+                value = value.saturating_add_signed((error * 5 / 16) as i8);
+
+                *p = image::Luma([value]);
+            }
+            if let Some(p) =
+                target_img.get_pixel_mut_checked((col_index) as u32, (row_index + 1) as u32)
+            {
+                let mut value = p.0[0];
+                value = value.saturating_add_signed((error * 1 / 16) as i8);
+
+                *p = image::Luma([value]);
+            }
+
             s += char.to_string().as_str();
         }
+        println!("{}", s);
         output.push(s);
-        println!("");
     }
 
-    for string in output {
-        let mut curr_char = string.chars().next().unwrap();
-        let mut count: u32 = 1;
-        for char in string.chars().skip(1) {
-            if char == curr_char {
-                count += 1;
-            } else {
-                print!("({}, {}) ", curr_char, count);
-                count = 1;
-                curr_char = char;
-            }
-        }
-        print!("({}, {}) ", curr_char, count);
-        println!("");
-    }
+    target_img.save("test.png").unwrap();
+
+    // print some run-length-encoded output for easier typing
+    // for string in output {
+    //     let mut curr_char = string.chars().next().unwrap();
+    //     let mut count: u32 = 1;
+    //     for char in string.chars().skip(1) {
+    //         if char == curr_char {
+    //             count += 1;
+    //         } else {
+    //             print!("({}, {}) ", curr_char, count);
+    //             count = 1;
+    //             curr_char = char;
+    //         }
+    //     }
+    //     print!("({}, {}) ", curr_char, count);
+    //     println!("");
+    // }
 }
 
 fn get_aggregate_pixel_at<I: GenericImageView<Pixel = Luma<u8>>>(
@@ -86,4 +126,22 @@ fn get_aggregate_pixel_at<I: GenericImageView<Pixel = Luma<u8>>>(
     let area = (x_end - x_begin) * (y_end - y_begin);
 
     return (acc / area) as u8;
+}
+
+fn find_closest_value_in_arr(value: i32) -> (char, i32) {
+    let arr = CHAR_BRIGHTNESSES;
+    let char_arr = CHAR_SET;
+
+    let mut closest: i32 = arr[0];
+    let mut distance: i32 = (value - arr[0]).abs();
+    let mut closest_char = char_arr[0];
+
+    for (num, char) in arr.iter().zip(char_arr.iter()).skip(1) {
+        if (value - num).abs() < distance {
+            distance = (value - num).abs();
+            closest = *num;
+            closest_char = *char;
+        }
+    }
+    return (closest_char, closest);
 }
