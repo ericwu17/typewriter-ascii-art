@@ -7,7 +7,8 @@ const TARGET_IMG_WIDTH_PIXELS: u32 = 68;
 // pixel height (on typewriter) is 2.1 mm
 // pixel width (on typewriter) is 2.5 mm
 
-const CHAR_SET: [char; 8] = [' ', '.', ':', ';', 'I', 'V', 'N', 'M'];
+// The 'o' actually represents a space on the typewriter
+const CHAR_SET: [char; 8] = ['o', '.', ':', ';', 'I', 'V', 'N', 'M'];
 const CHAR_BRIGHTNESSES: [i32; 8] = [255, 219, 182, 146, 109, 73, 36, 0];
 
 fn main() {
@@ -34,6 +35,8 @@ fn main() {
             let (char, pixel_value) = find_closest_value_in_arr(val as i32);
             let pixel_value = pixel_value as u8;
             let error = val as i32 - pixel_value as i32;
+
+            *target_img.get_pixel_mut(col_index, row_index) = image::Luma([pixel_value]);
 
             // propagate the error to neighboring pixels using the Floyd–Steinberg dithering coefficients
             // https://en.wikipedia.org/wiki/Floyd%E2%80%93Steinberg_dithering
@@ -79,21 +82,30 @@ fn main() {
     target_img.save("test.png").unwrap();
 
     // print some run-length-encoded output for easier typing
-    // for string in output {
-    //     let mut curr_char = string.chars().next().unwrap();
-    //     let mut count: u32 = 1;
-    //     for char in string.chars().skip(1) {
-    //         if char == curr_char {
-    //             count += 1;
-    //         } else {
-    //             print!("({}, {}) ", curr_char, count);
-    //             count = 1;
-    //             curr_char = char;
-    //         }
-    //     }
-    //     print!("({}, {}) ", curr_char, count);
-    //     println!("");
-    // }
+    for string in output {
+        let mut curr_char = string.chars().next().unwrap();
+        let mut count: u32 = 1;
+        for char in string.chars().skip(1) {
+            if char == curr_char {
+                count += 1;
+            } else {
+                if count > 2 {
+                    print!("({}, {}) ", curr_char, count);
+                } else {
+                    for _ in 0..count {
+                        print!("{}", curr_char);
+                    }
+                }
+
+                count = 1;
+                curr_char = char;
+            }
+        }
+        print!("({}, {}) ", curr_char, count);
+
+        println!("");
+        println!("");
+    }
 }
 
 fn get_aggregate_pixel_at<I: GenericImageView<Pixel = Luma<u8>>>(
