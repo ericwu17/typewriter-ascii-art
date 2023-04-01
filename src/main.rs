@@ -90,7 +90,7 @@ fn main() {
                 count += 1;
             } else {
                 if count > 2 {
-                    print!("({}, {}) ", curr_char, count);
+                    print!("({} {}) ", curr_char, count);
                 } else {
                     for _ in 0..count {
                         print!("{}", curr_char);
@@ -101,7 +101,7 @@ fn main() {
                 curr_char = char;
             }
         }
-        print!("({}, {}) ", curr_char, count);
+        print!("({} {}) ", curr_char, count);
 
         println!("");
         println!("");
