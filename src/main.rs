@@ -4,15 +4,16 @@ use image::{GenericImageView, ImageBuffer, Luma, Pixel};
 const TARGET_IMG_HEIGHT_PIXELS: u32 = 108;
 const TARGET_IMG_WIDTH_PIXELS: u32 = 68;
 
-// pixel height (on typewriter) is 2.1 mm
-// pixel width (on typewriter) is 2.5 mm
+// pixel height (on my typewriter) is 2.1 mm
+// pixel width (on my typewriter) is 2.5 mm
 
-// The 'o' actually represents a space on the typewriter
-const CHAR_SET: [char; 8] = ['o', '.', ':', ';', 'I', 'V', 'N', 'M'];
+// The ' ' actually represents a space on the typewriter
+const CHAR_SET: [char; 8] = [' ', '.', ':', ';', 'I', 'V', 'N', 'M'];
+// for now we will use a linear scale for each character in the char set and see how it looks.
 const CHAR_BRIGHTNESSES: [i32; 8] = [255, 219, 182, 146, 109, 73, 36, 0];
 
 fn main() {
-    let img = image::open("IMG_1167.JPG").unwrap();
+    let img = image::open("input_image.JPG").unwrap();
     let img = grayscale(&img);
 
     let (width, height) = img.dimensions();
@@ -24,15 +25,32 @@ fn main() {
             image::Luma([get_aggregate_pixel_at(x, y, width, height, &img)])
         });
 
-    // for now we will use a linear scale for each character in the char set and see how it looks.
+    let output = generate_ascii_output(&mut target_img);
 
-    let mut output = Vec::<String>::new();
+    target_img.save("test.png").unwrap();
+
+    // print the raw ASCII art output
+    for line in &output {
+        println!("{}", line);
+    }
+
+    // print some run-length-encoded output for easier typing
+    print_run_length_encoded(&output);
+}
+
+fn generate_ascii_output(target_img: &mut ImageBuffer<Luma<u8>, Vec<u8>>) -> Vec<String> {
+    // returns an ASCII representation of target_img as a Vec<String>,
+    // and also modifies target_img to match the pixel values of the actual ascii characters
+    // (so target_img will gain a dithered effect after running this function)
+
+    let mut result = Vec::new();
+
     for row_index in 0..target_img.height() {
         let mut s = String::new();
         for col_index in 0..target_img.width() {
             let pixel = target_img.get_pixel(col_index, row_index);
             let val: u8 = pixel.0[0];
-            let (char, pixel_value) = find_closest_value_in_arr(val as i32);
+            let (char, pixel_value) = find_closest_character(val as i32);
             let pixel_value = pixel_value as u8;
             let error = val as i32 - pixel_value as i32;
 
@@ -75,37 +93,10 @@ fn main() {
 
             s += char.to_string().as_str();
         }
-        println!("{}", s);
-        output.push(s);
+        result.push(s);
     }
 
-    target_img.save("test.png").unwrap();
-
-    // print some run-length-encoded output for easier typing
-    for string in output {
-        let mut curr_char = string.chars().next().unwrap();
-        let mut count: u32 = 1;
-        for char in string.chars().skip(1) {
-            if char == curr_char {
-                count += 1;
-            } else {
-                if count > 2 {
-                    print!("({} {}) ", curr_char, count);
-                } else {
-                    for _ in 0..count {
-                        print!("{}", curr_char);
-                    }
-                }
-
-                count = 1;
-                curr_char = char;
-            }
-        }
-        print!("({} {}) ", curr_char, count);
-
-        println!("");
-        println!("");
-    }
+    return result;
 }
 
 fn get_aggregate_pixel_at<I: GenericImageView<Pixel = Luma<u8>>>(
@@ -140,7 +131,7 @@ fn get_aggregate_pixel_at<I: GenericImageView<Pixel = Luma<u8>>>(
     return (acc / area) as u8;
 }
 
-fn find_closest_value_in_arr(value: i32) -> (char, i32) {
+fn find_closest_character(value: i32) -> (char, i32) {
     let arr = CHAR_BRIGHTNESSES;
     let char_arr = CHAR_SET;
 
@@ -156,4 +147,31 @@ fn find_closest_value_in_arr(value: i32) -> (char, i32) {
         }
     }
     return (closest_char, closest);
+}
+
+fn print_run_length_encoded(output: &Vec<String>) {
+    for string in output {
+        let mut curr_char = string.chars().next().unwrap();
+        let mut count: u32 = 1;
+        for char in string.chars().skip(1) {
+            if char == curr_char {
+                count += 1;
+            } else {
+                if count > 2 {
+                    print!(" ({} {}) ", curr_char, count);
+                } else {
+                    for _ in 0..count {
+                        print!("{}", curr_char);
+                    }
+                }
+
+                count = 1;
+                curr_char = char;
+            }
+        }
+        print!("({} {}) ", curr_char, count);
+
+        println!("");
+        println!("");
+    }
 }
