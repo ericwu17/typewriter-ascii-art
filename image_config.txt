@@ -1,0 +1,6 @@
+68
+108
+
+The first two lines of this file will be read by the program.
+The first line is the width of the generated image, in pixels.
+The second line is the height of the generated image, in pixels.

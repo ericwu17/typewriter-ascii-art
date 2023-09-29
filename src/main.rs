@@ -1,8 +1,7 @@
 use image::imageops::colorops::grayscale;
 use image::{GenericImageView, ImageBuffer, Luma, Pixel};
-
-const TARGET_IMG_HEIGHT_PIXELS: u32 = 108;
-const TARGET_IMG_WIDTH_PIXELS: u32 = 68;
+use std::fs::File;
+use std::io::{self, BufRead};
 
 // pixel height (on my typewriter) is 2.1 mm
 // pixel width (on my typewriter) is 2.5 mm
@@ -18,12 +17,21 @@ fn main() {
 
     let (width, height) = img.dimensions();
 
+    let (target_width, target_height) = read_target_width_height();
+
     // target image will be the original image (img) rescaled, where each pixel in target_img will
     // be the average of the corresponding area in img.
-    let mut target_img =
-        ImageBuffer::from_fn(TARGET_IMG_WIDTH_PIXELS, TARGET_IMG_HEIGHT_PIXELS, |x, y| {
-            image::Luma([get_aggregate_pixel_at(x, y, width, height, &img)])
-        });
+    let mut target_img = ImageBuffer::from_fn(target_width, target_height, |x, y| {
+        image::Luma([get_aggregate_pixel_at(
+            x,
+            y,
+            width,
+            height,
+            target_width,
+            target_height,
+            &img,
+        )])
+    });
 
     let output = generate_ascii_output(&mut target_img);
 
@@ -104,6 +112,8 @@ fn get_aggregate_pixel_at<I: GenericImageView<Pixel = Luma<u8>>>(
     y: u32,
     source_width: u32,
     source_height: u32,
+    target_width: u32,
+    target_height: u32,
     img: &I,
 ) -> u8 {
     // takes a position in the TARGET image and then returns what the value of that position
@@ -113,10 +123,10 @@ fn get_aggregate_pixel_at<I: GenericImageView<Pixel = Luma<u8>>>(
     // restraints on inputs: 0 <= x < TARGET_IMG_WIDTH_PIXELS
     //                       0 <= y < TARGET_IMG_HEIGHT_PIXELS
 
-    let x_begin: u32 = (x * source_width) / TARGET_IMG_WIDTH_PIXELS;
-    let y_begin: u32 = (y * source_height) / TARGET_IMG_HEIGHT_PIXELS;
-    let x_end: u32 = ((x + 1) * source_width) / TARGET_IMG_WIDTH_PIXELS;
-    let y_end: u32 = ((y + 1) * source_height) / TARGET_IMG_HEIGHT_PIXELS;
+    let x_begin: u32 = (x * source_width) / target_width;
+    let y_begin: u32 = (y * source_height) / target_height;
+    let x_end: u32 = ((x + 1) * source_width) / target_width;
+    let y_end: u32 = ((y + 1) * source_height) / target_height;
 
     let mut acc: u32 = 0;
     for x in x_begin..x_end {
@@ -174,4 +184,14 @@ fn print_run_length_encoded(output: &Vec<String>) {
         println!("");
         println!("");
     }
+}
+
+fn read_target_width_height() -> (u32, u32) {
+    let file = File::open("image_config.txt").unwrap();
+    let mut lines: io::Lines<io::BufReader<File>> = io::BufReader::new(file).lines();
+    let width = u32::from_str_radix(&lines.next().unwrap().unwrap(), 10)
+        .expect("Expected a valid number in first line of image config");
+    let height = u32::from_str_radix(&lines.next().unwrap().unwrap(), 10)
+        .expect("Expected a valid number in second line of image config");
+    (width, height)
 }
