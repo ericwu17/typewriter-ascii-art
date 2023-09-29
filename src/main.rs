@@ -6,8 +6,8 @@ use std::io::{self, BufRead};
 // pixel height (on my typewriter) is 2.1 mm
 // pixel width (on my typewriter) is 2.5 mm
 
-// The ' ' actually represents a space on the typewriter
-const CHAR_SET: [char; 8] = [' ', '.', ':', ';', 'I', 'V', 'N', 'M'];
+// The '0' actually represents a space on the typewriter
+const CHAR_SET: [char; 8] = ['0', '.', ':', ';', 'I', 'V', 'N', 'M'];
 // for now we will use a linear scale for each character in the char set and see how it looks.
 const CHAR_BRIGHTNESSES: [i32; 8] = [255, 219, 182, 146, 109, 73, 36, 0];
 
@@ -160,6 +160,8 @@ fn find_closest_character(value: i32) -> (char, i32) {
 }
 
 fn print_run_length_encoded(output: &Vec<String>) {
+    const MAX_UNENCODED_RUN_LENGTH: u32 = 2;
+
     for string in output {
         let mut curr_char = string.chars().next().unwrap();
         let mut count: u32 = 1;
@@ -167,7 +169,7 @@ fn print_run_length_encoded(output: &Vec<String>) {
             if char == curr_char {
                 count += 1;
             } else {
-                if count > 2 {
+                if count > MAX_UNENCODED_RUN_LENGTH {
                     print!(" ({} {}) ", curr_char, count);
                 } else {
                     for _ in 0..count {
@@ -179,7 +181,13 @@ fn print_run_length_encoded(output: &Vec<String>) {
                 curr_char = char;
             }
         }
-        print!("({} {}) ", curr_char, count);
+        if count > MAX_UNENCODED_RUN_LENGTH {
+            print!("({} {}) ", curr_char, count);
+        } else {
+            for _ in 0..count {
+                print!("{}", curr_char);
+            }
+        }
 
         println!("");
         println!("");
@@ -187,7 +195,7 @@ fn print_run_length_encoded(output: &Vec<String>) {
 }
 
 fn read_target_width_height() -> (u32, u32) {
-    let file = File::open("image_config.txt").unwrap();
+    let file = File::open("output_image_config.txt").unwrap();
     let mut lines: io::Lines<io::BufReader<File>> = io::BufReader::new(file).lines();
     let width = u32::from_str_radix(&lines.next().unwrap().unwrap(), 10)
         .expect("Expected a valid number in first line of image config");
